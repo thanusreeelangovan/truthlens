@@ -4,7 +4,7 @@ import axios from "axios";
 import { useDropzone } from "react-dropzone";
 import ResultCard from "./ResultCard";
 import InstallBanner from "./InstallBanner";
-import AdminDashboard from "../admin/AdminDashboard"; // ✅ added
+import AdminDashboard from "../admin/AdminDashboard";
 import { useTheme } from "../theme/ThemeContext";
 import { useAuth } from "../auth/AuthContext";
 import "./VideoUpload.css";
@@ -16,13 +16,12 @@ function VideoUpload() {
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
 
-  const [showAdmin, setShowAdmin] = useState(false); // ✅ added
-  const [userInfo, setUserInfo] = useState(null); // ✅ added
+  const [showAdmin, setShowAdmin] = useState(false);
+  const [userInfo, setUserInfo] = useState(null);
 
   const { theme, mode, toggle } = useTheme();
   const { user, logout } = useAuth();
 
-  // ✅ Fetch user info (for admin check)
   useEffect(() => {
     axios.get(`${API_BASE}/api/v1/auth/me`)
       .then(res => setUserInfo(res.data))
@@ -30,10 +29,8 @@ function VideoUpload() {
   }, []);
 
   const onDrop = (acceptedFiles) => {
-    if (!acceptedFiles || acceptedFiles.length === 0) return;
-
-    const selected = acceptedFiles[0];
-    setFile(selected);
+    if (!acceptedFiles?.length) return;
+    setFile(acceptedFiles[0]);
     setResult(null);
     setError(null);
   };
@@ -47,10 +44,8 @@ function VideoUpload() {
   const handleUpload = async () => {
     if (!file) return;
 
-    const MAX_MB = 100;
-
-    if (file.size > MAX_MB * 1024 * 1024) {
-      setError(`File too large. Maximum allowed size is ${MAX_MB} MB.`);
+    if (file.size > 100 * 1024 * 1024) {
+      setError("File too large (max 100MB)");
       return;
     }
 
@@ -63,40 +58,24 @@ function VideoUpload() {
     formData.append("file", file);
 
     try {
-      const response = await axios.post(
+      const res = await axios.post(
         `${API_BASE}/api/v1/detect/video`,
         formData,
         {
-          headers: {
-            "Content-Type": "multipart/form-data"
-          },
-          onUploadProgress: (progressEvent) => {
-            if (!progressEvent.total) return;
-
-            const percent = Math.round(
-              (progressEvent.loaded * 100) / progressEvent.total
-            );
-
-            setUploadPct(percent);
+          headers: { "Content-Type": "multipart/form-data" },
+          onUploadProgress: (e) => {
+            if (!e.total) return;
+            setUploadPct(Math.round((e.loaded * 100) / e.total));
           }
         }
       );
-
-      setResult(response.data);
+      setResult(res.data);
     } catch (err) {
-      if (err.response) {
-        setError(
-          `Server error ${err.response.status}: ${JSON.stringify(
-            err.response.data
-          )}`
-        );
-      } else if (err.request) {
-        setError(
-          "No response from server. Make sure your backend is running."
-        );
-      } else {
-        setError(err.message);
-      }
+      setError(
+        err.response
+          ? `Server ${err.response.status}`
+          : "Backend not reachable"
+      );
     } finally {
       setUploading(false);
       setUploadPct(0);
@@ -108,54 +87,29 @@ function VideoUpload() {
     window.location.href = "/login";
   };
 
-  const handleReset = () => {
-    setFile(null);
-    setResult(null);
-    setError(null);
-  };
-
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: theme.background,
-        padding: "40px 20px",
-        color: theme.text,
-        textAlign: "center",
-        position: "relative"
-      }}
-    >
+    <div style={{
+      minHeight: "100vh",
+      background: theme.background,
+      color: theme.text,
+      padding: 40,
+      textAlign: "center",
+      position: "relative"
+    }}>
       <h1>🔍 TruthLens</h1>
 
-      {/* Top right controls */}
-      <div
-        style={{
-          position: "absolute",
-          top: "20px",
-          right: "20px",
-          display: "flex",
-          alignItems: "center",
-          gap: "10px"
-        }}
-      >
-        <span style={{ color: theme.text, fontSize: "0.85em" }}>
-          👤 {user?.username || "Guest"}
-        </span>
+      {/* Top bar */}
+      <div style={{ position: "absolute", top: 20, right: 20, display: "flex", gap: 10 }}>
+        <span>👤 {user?.username || "Guest"}</span>
 
-        {/* ✅ Admin button */}
         {userInfo?.is_admin && !showAdmin && (
-          <button onClick={() => setShowAdmin(true)}>
-            🛡️ Admin
-          </button>
+          <button onClick={() => setShowAdmin(true)}>🛡️ Admin</button>
         )}
 
-        <button onClick={handleLogout}>Log out</button>
-        <button onClick={toggle}>
-          {mode === "dark" ? "☀️" : "🌙"}
-        </button>
+        <button onClick={handleLogout}>Logout</button>
+        <button onClick={toggle}>{mode === "dark" ? "☀️" : "🌙"}</button>
       </div>
 
-      {/* ✅ Admin Dashboard */}
       {showAdmin ? (
         <AdminDashboard onBack={() => setShowAdmin(false)} />
       ) : (
@@ -164,49 +118,56 @@ function VideoUpload() {
 
           {!result && (
             <>
+              {/* ✅ Accessible Dropzone */}
               <div
                 {...getRootProps()}
                 className={`dropzone ${isDragActive ? "active" : ""}`}
+                role="button"
+                aria-label="Upload video by clicking or dragging"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    getRootProps().onClick?.(e);
+                  }
+                }}
               >
                 <input {...getInputProps()} />
-
-                {file ? (
-                  <p>📹 {file.name}</p>
-                ) : isDragActive ? (
-                  <p>📂 Drop it here</p>
-                ) : (
-                  <p>📤 Drag video here or click to select</p>
-                )}
+                {file ? <p>{file.name}</p> : <p>📤 Upload video</p>}
               </div>
 
-              <p className="file-info">
-                Supports MP4 AVI MOV | Max 100 MB
-              </p>
+              <p>Max 100MB (MP4, AVI, MOV)</p>
 
               {file && !uploading && (
-                <>
-                  <p style={{ opacity: 0.6 }}>
-                    {(file.size / 1024 / 1024).toFixed(2)} MB
-                  </p>
-
-                  <button onClick={handleUpload}>
-                    🔍 Analyze Video
-                  </button>
-                </>
+                <button
+                  onClick={handleUpload}
+                  className="upload-btn"
+                  aria-label={`Analyze ${file.name}`}
+                  aria-busy={uploading}
+                >
+                  🔍 Analyze
+                </button>
               )}
 
               {uploading && (
-                <p>
-                  {uploadPct < 100
-                    ? `Uploading ${uploadPct}%`
-                    : "Analyzing..."}
-                </p>
+                <p>{uploadPct < 100 ? `Uploading ${uploadPct}%` : "Analyzing..."}</p>
               )}
             </>
           )}
 
-          {error && <p>{error}</p>}
-          {result && <ResultCard result={result} onReset={handleReset} />}
+          {/* ✅ Error */}
+          {error && (
+            <div role="alert" aria-live="assertive">
+              {error}
+            </div>
+          )}
+
+          {/* ✅ Result */}
+          {result && (
+            <div role="region" aria-live="polite">
+              <ResultCard result={result} />
+            </div>
+          )}
 
           <InstallBanner />
         </>
