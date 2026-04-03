@@ -1,9 +1,10 @@
 import API_BASE from "../config";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { useDropzone } from "react-dropzone";
 import ResultCard from "./ResultCard";
-import InstallBanner from "./InstallBanner"; // ✅ added
+import InstallBanner from "./InstallBanner";
+import AdminDashboard from "../admin/AdminDashboard"; // ✅ added
 import { useTheme } from "../theme/ThemeContext";
 import { useAuth } from "../auth/AuthContext";
 import "./VideoUpload.css";
@@ -15,8 +16,18 @@ function VideoUpload() {
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
 
+  const [showAdmin, setShowAdmin] = useState(false); // ✅ added
+  const [userInfo, setUserInfo] = useState(null); // ✅ added
+
   const { theme, mode, toggle } = useTheme();
   const { user, logout } = useAuth();
+
+  // ✅ Fetch user info (for admin check)
+  useEffect(() => {
+    axios.get(`${API_BASE}/api/v1/auth/me`)
+      .then(res => setUserInfo(res.data))
+      .catch(() => {});
+  }, []);
 
   const onDrop = (acceptedFiles) => {
     if (!acceptedFiles || acceptedFiles.length === 0) return;
@@ -116,6 +127,7 @@ function VideoUpload() {
     >
       <h1>🔍 TruthLens</h1>
 
+      {/* Top right controls */}
       <div
         style={{
           position: "absolute",
@@ -130,62 +142,75 @@ function VideoUpload() {
           👤 {user?.username || "Guest"}
         </span>
 
+        {/* ✅ Admin button */}
+        {userInfo?.is_admin && !showAdmin && (
+          <button onClick={() => setShowAdmin(true)}>
+            🛡️ Admin
+          </button>
+        )}
+
         <button onClick={handleLogout}>Log out</button>
         <button onClick={toggle}>
           {mode === "dark" ? "☀️" : "🌙"}
         </button>
       </div>
 
-      <p className="subtitle">AI Powered Deepfake Detection</p>
-
-      {!result && (
+      {/* ✅ Admin Dashboard */}
+      {showAdmin ? (
+        <AdminDashboard onBack={() => setShowAdmin(false)} />
+      ) : (
         <>
-          <div
-            {...getRootProps()}
-            className={`dropzone ${isDragActive ? "active" : ""}`}
-          >
-            <input {...getInputProps()} />
+          <p className="subtitle">AI Powered Deepfake Detection</p>
 
-            {file ? (
-              <p>📹 {file.name}</p>
-            ) : isDragActive ? (
-              <p>📂 Drop it here</p>
-            ) : (
-              <p>📤 Drag video here or click to select</p>
-            )}
-          </div>
-
-          <p className="file-info">
-            Supports MP4 AVI MOV | Max 100 MB
-          </p>
-
-          {file && !uploading && (
+          {!result && (
             <>
-              <p style={{ opacity: 0.6 }}>
-                {(file.size / 1024 / 1024).toFixed(2)} MB
+              <div
+                {...getRootProps()}
+                className={`dropzone ${isDragActive ? "active" : ""}`}
+              >
+                <input {...getInputProps()} />
+
+                {file ? (
+                  <p>📹 {file.name}</p>
+                ) : isDragActive ? (
+                  <p>📂 Drop it here</p>
+                ) : (
+                  <p>📤 Drag video here or click to select</p>
+                )}
+              </div>
+
+              <p className="file-info">
+                Supports MP4 AVI MOV | Max 100 MB
               </p>
 
-              <button onClick={handleUpload}>
-                🔍 Analyze Video
-              </button>
+              {file && !uploading && (
+                <>
+                  <p style={{ opacity: 0.6 }}>
+                    {(file.size / 1024 / 1024).toFixed(2)} MB
+                  </p>
+
+                  <button onClick={handleUpload}>
+                    🔍 Analyze Video
+                  </button>
+                </>
+              )}
+
+              {uploading && (
+                <p>
+                  {uploadPct < 100
+                    ? `Uploading ${uploadPct}%`
+                    : "Analyzing..."}
+                </p>
+              )}
             </>
           )}
 
-          {uploading && (
-            <p>
-              {uploadPct < 100
-                ? `Uploading ${uploadPct}%`
-                : "Analyzing..."}
-            </p>
-          )}
+          {error && <p>{error}</p>}
+          {result && <ResultCard result={result} onReset={handleReset} />}
+
+          <InstallBanner />
         </>
       )}
-
-      {error && <p>{error}</p>}
-      {result && <ResultCard result={result} onReset={handleReset} />}
-
-      {/* ✅ Install banner at bottom */}
-      <InstallBanner />
     </div>
   );
 }
