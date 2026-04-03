@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import axios from "axios";
 import { useDropzone } from "react-dropzone";
 import ResultCard from "./ResultCard";
+import InstallBanner from "./InstallBanner"; // ✅ added
 import { useTheme } from "../theme/ThemeContext";
 import { useAuth } from "../auth/AuthContext";
 import "./VideoUpload.css";
@@ -182,6 +183,9 @@ function VideoUpload() {
 
       {error && <p>{error}</p>}
       {result && <ResultCard result={result} onReset={handleReset} />}
+
+      {/* ✅ Install banner at bottom */}
+      <InstallBanner />
     </div>
   );
 }
